@@ -4,12 +4,14 @@ const {
     GraphQLInt,
     GraphQLList,
     GraphQLString,
-    GraphQLNonNull
+    GraphQLInputObjectType,
+    GraphQLNonNull,
+    graphql
 } = require('graphql')
 
 
 const Sequelize = require('sequelize')
-const sequelize = new Sequelize('grapql_db','arief','arief',{
+const sequelize = new Sequelize('graphql_db','arief','arief',{
     operatorsAliases:false,
     dialect:'mysql'
 })
@@ -58,7 +60,7 @@ CarModel.belongsTo(PersonModel,{
 
 const carType = new GraphQLObjectType({
     name:'Car',
-    fields:{
+    fields: () => ({
         id:{
             type:new GraphQLNonNull(GraphQLString)
         },
@@ -66,18 +68,42 @@ const carType = new GraphQLObjectType({
             type:new GraphQLNonNull(GraphQLString)
         },
         person:{
-            type:new GraphQLObjectType(personType),
+            type:personType,
             resolve:(obj , args , ctx , info)=>{
                 console.log(obj)
                 return null
             }
         }
+    })
+})
+
+
+
+const inputPersonType = new GraphQLInputObjectType({
+    name:'PersonInput',
+    fields:{
+        id:{
+            type:GraphQLInt
+        },
+        name:{
+            type:new GraphQLNonNull(GraphQLString)
+        },
+        address:{
+            type:new GraphQLNonNull(GraphQLString)
+        }
+    }
+})
+
+const inputCarType = new GraphQLInputObjectType({
+    name:'CarInput',
+    fields:{
+        
     }
 })
 
 const personType = new GraphQLObjectType({
     name:'Person',
-    fields:{
+    fields: () =>({
         id:{
             type:new GraphQLNonNull(GraphQLInt)
         },
@@ -94,8 +120,10 @@ const personType = new GraphQLObjectType({
                 return null
             }
         }
-    }
+    })
 })
+
+
 
 const queryType = new GraphQLObjectType({
     name:'Query',
@@ -139,11 +167,38 @@ const queryType = new GraphQLObjectType({
 const mutationType = new GraphQLObjectType({
     name:'Mutation',
     fields:{
-        
+        newPerson: {
+
+        },
+        newCar:{
+
+        }
     }
 })
 
+const introspectSchemaQuery = `
+    {
+        __schema {
+            types {
+                name
+                fields {
+                    name
+                }
+            }
+        }
+    }
+`
+
 const gSchema = new GraphQLSchema({
     query:queryType,
-    mutation:mutationType,
+    // mutation:mutationType,
 })
+
+sequelize
+    .sync()
+    .then(_=>{
+        console.log('Database OK !')
+    })
+    .catch(err=>{
+        console.error(err)
+    })
