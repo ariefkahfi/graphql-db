@@ -5,6 +5,7 @@ const {
     GraphQLList,
     GraphQLString,
     GraphQLInputObjectType,
+    GraphQLBoolean,
     GraphQLNonNull,
     graphql
 } = require('graphql')
@@ -97,7 +98,12 @@ const inputPersonType = new GraphQLInputObjectType({
 const inputCarType = new GraphQLInputObjectType({
     name:'CarInput',
     fields:{
-        
+        id:{
+            type:GraphQLString
+        },
+        name:{
+            type:new GraphQLNonNull(GraphQLString)
+        },
     }
 })
 
@@ -131,13 +137,13 @@ const queryType = new GraphQLObjectType({
         allCar: {
             type:new GraphQLList(carType),
             resolve:(obj,args,ctx,info)=>{
-
+                return null
             }
         },
         allPerson: {
             type:new GraphQLList(personType),
             resolve:(obj,args,ctx,info)=>{
-
+                return null
             }
         },
         findCarById: {
@@ -168,10 +174,28 @@ const mutationType = new GraphQLObjectType({
     name:'Mutation',
     fields:{
         newPerson: {
-
+            args:{
+                personInput:{
+                    type:new GraphQLNonNull(inputPersonType)
+                }
+            },
+            resolve:(obj,args,ctx,info)=>{
+                console.log(args)
+                return false
+            },
+            type:GraphQLBoolean
         },
         newCar:{
-
+            args:{
+                carInput:{
+                    type:new GraphQLNonNull(inputCarType)
+                }
+            },
+            resolve:(obj,args,ctx,info)=>{
+                console.log(args)
+                return false
+            },
+            type:GraphQLBoolean
         }
     }
 })
@@ -191,7 +215,7 @@ const introspectSchemaQuery = `
 
 const gSchema = new GraphQLSchema({
     query:queryType,
-    // mutation:mutationType,
+    mutation:mutationType,
 })
 
 sequelize
