@@ -16,6 +16,7 @@ const sequelize = new Sequelize('graphql_db','arief','arief',{
     operatorsAliases:false,
     dialect:'mysql'
 })
+const uniqid = require('uniqid')
 
 const CarModel = sequelize.define('car',{
     car_id:{
@@ -99,7 +100,7 @@ const inputCarType = new GraphQLInputObjectType({
     name:'CarInput',
     fields:{
         id:{
-            type:GraphQLString
+            type:new GraphQLNonNull(GraphQLString)
         },
         name:{
             type:new GraphQLNonNull(GraphQLString)
@@ -180,8 +181,11 @@ const mutationType = new GraphQLObjectType({
                 }
             },
             resolve:(obj,args,ctx,info)=>{
-                console.log(args)
-                return false
+                const {personInput} = args
+                return ctx.PersonModel.create({
+                    person_name:personInput.name,
+                    person_address:personInput.address
+                }).then(b=> true)
             },
             type:GraphQLBoolean
         },
@@ -213,15 +217,44 @@ const introspectSchemaQuery = `
     }
 `
 
+const myQueries = `
+    mutation createNewPerson($nPerson: PersonInput!) {
+        newPerson(personInput: $nPerson)
+    }
+
+    mutation createNewCar($nCar: CarInput!) {
+        newCar(carInput: $nCar)
+    }
+`
+
 const gSchema = new GraphQLSchema({
     query:queryType,
     mutation:mutationType,
 })
 
 sequelize
-    .sync()
+    .sync({
+        force:true
+    })
     .then(_=>{
         console.log('Database OK !')
+        return graphql(gSchema , introspectSchemaQuery)
+    })
+    .then(x=>{
+        console.log('after introspecting schema...')
+    })
+    .then(_=>{
+        return graphql(gSchema , myQueries , null , {
+            PersonModel
+        },{
+            nPerson: {
+                name:'aa1',
+                address:'address1'
+            }
+        } , 'createNewPerson')
+    })
+    .then(iResult=>{
+        console.log(JSON.stringify(iResult))
     })
     .catch(err=>{
         console.error(err)
