@@ -63,14 +63,36 @@ CarModel.belongsTo(PersonModel,{
 const carType = new GraphQLObjectType({
     name:'Car',
     fields: () => ({
-        id:{
+        car_id:{
             type:new GraphQLNonNull(GraphQLString)
         },
-        name:{
+        car_name:{
             type:new GraphQLNonNull(GraphQLString)
         },
         person:{
             type:personType,
+            resolve:(obj , args , ctx , info)=>{
+                console.log(obj.person_id)
+                return ctx.PersonModel.findByPk(obj.person_id)
+            }
+        }
+    })
+})
+
+const personType = new GraphQLObjectType({
+    name:'Person',
+    fields: () =>({
+        person_id:{
+            type:new GraphQLNonNull(GraphQLInt)
+        },
+        person_name:{
+            type:new GraphQLNonNull(GraphQLString)
+        },
+        person_address:{
+            type:new GraphQLNonNull(GraphQLString)
+        },
+        cars: {
+            type:new GraphQLList(carType),
             resolve:(obj , args , ctx , info)=>{
                 console.log(obj)
                 return null
@@ -108,28 +130,17 @@ const inputCarType = new GraphQLInputObjectType({
     }
 })
 
-const personType = new GraphQLObjectType({
-    name:'Person',
-    fields: () =>({
-        id:{
-            type:new GraphQLNonNull(GraphQLInt)
-        },
-        name:{
-            type:new GraphQLNonNull(GraphQLString)
-        },
-        address:{
-            type:new GraphQLNonNull(GraphQLString)
-        },
-        cars: {
-            type:new GraphQLList(carType),
-            resolve:(obj , args , ctx , info)=>{
-                console.log(obj)
-                return null
-            }
-        }
-    })
-})
 
+async function setPersonForCar(personId ,carId) {
+    try{
+        const gCar = await CarModel.findById(carId)
+        const gPerson = await  PersonModel.findById(personId)
+        await gCar.setPerson(gPerson)
+        return true
+    }catch(ex){
+        return false
+    }
+}
 
 
 const queryType = new GraphQLObjectType({
@@ -138,13 +149,13 @@ const queryType = new GraphQLObjectType({
         allCar: {
             type:new GraphQLList(carType),
             resolve:(obj,args,ctx,info)=>{
-                return null
+                return ctx.CarModel.findAll()
             }
         },
         allPerson: {
             type:new GraphQLList(personType),
             resolve:(obj,args,ctx,info)=>{
-                return null
+                return ctx.PersonModel.findAll()
             }
         },
         findCarById: {
@@ -189,6 +200,22 @@ const mutationType = new GraphQLObjectType({
             },
             type:GraphQLBoolean
         },
+        addCarToPerson:{
+            args:{
+                personId:{
+                    type:new GraphQLNonNull(GraphQLInt)
+                },
+                carId:{
+                    type:new GraphQLNonNull(GraphQLString)
+                }
+            },
+            resolve:(obj,args,ctx,info)=>{
+                const personId = args.personId
+                const carId = args.carId
+                return ctx.setPersonForCar(personId , carId)
+            },
+            type:GraphQLBoolean
+        },
         newCar:{
             args:{
                 carInput:{
@@ -196,8 +223,12 @@ const mutationType = new GraphQLObjectType({
                 }
             },
             resolve:(obj,args,ctx,info)=>{
-                console.log(args)
-                return false
+                const {carInput} = args
+                return ctx.CarModel.create({
+                    car_id:carInput.id,
+                    car_name:carInput.name
+                }).then(b=> true)
+                .catch(err=> false)
             },
             type:GraphQLBoolean
         }
@@ -225,12 +256,36 @@ const myQueries = `
     mutation createNewCar($nCar: CarInput!) {
         newCar(carInput: $nCar)
     }
+
+    mutation setPersonForCar($pId: Int!, $cId: String!) {
+        addCarToPerson(personId: $pId, carId: $cId)   
+    }
+
+    query qListCar {
+        allCar {
+            car_name
+            person {
+                person_name
+                person_address
+            }
+        }
+    }
+
+    query qListPerson {
+        allPerson {
+            person_id
+            person_name
+            person_address
+        }
+    }
 `
 
 const gSchema = new GraphQLSchema({
     query:queryType,
     mutation:mutationType,
 })
+
+const testCarId = uniqid("C_")
 
 sequelize
     .sync({
@@ -255,6 +310,33 @@ sequelize
     })
     .then(iResult=>{
         console.log(JSON.stringify(iResult))
+        return graphql(gSchema , myQueries , null , {
+            CarModel
+        },{
+            nCar:{
+                id:testCarId,
+                name:"Car1"
+            }
+        }, 'createNewCar')
+    })
+    .then(iResult=>{
+        console.log(JSON.stringify(iResult))
+        return graphql(gSchema,myQueries , null , {
+            setPersonForCar
+        },{
+            pId: 1,
+            cId: testCarId
+        },'setPersonForCar')
+    })
+    .then(u=>{
+        console.log(JSON.stringify(u))
+        return graphql(gSchema,myQueries , null ,{
+            CarModel,
+            PersonModel
+        },null,'qListCar')
+    })
+    .then(r=>{
+        console.log(JSON.stringify(r))
     })
     .catch(err=>{
         console.error(err)
